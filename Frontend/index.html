@@ -4,23 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Doctor Login</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
   </head>
-  <body class="d-flex justify-content-center align-items-center vh-100 bg-light">
+  <body class="d-flex justify-content-center align-items-center vh-100">
     <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
-      <div class="text-center mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16">
-          <defs>
-            <clipPath id="circleClip">
-              <circle cx="8" cy="8" r="8" />
-            </clipPath>
-          </defs>
-          <image href="./Resources/295067.svg" width="16" height="16" clip-path="url(#circleClip)" />
-        </svg>
+      <div class="text-center mb-3"> 
+        <img src="./Resources/295067.svg" alt="Logo" class="img-fluid" style="width: 20%; height: auto;">
       </div>
-      <h4 class="text-center mb-4">Welcome Back</h4>
-      <p class="text-center mb-4">Please login to your account</p>
-      <form>
+      <p class="text-center mb-4 text-secondary">Sign in to access your dashboard</p>
+      <div id="loginAlert" style="display:none;"></div>
+      <form id="loginForm" autocomplete="off">
         <div class="mb-3">
           <label for="loginEmail" class="form-label">Email address</label>
           <input type="email" class="form-control" id="loginEmail" placeholder="Enter your email" required>
@@ -38,6 +32,43 @@
         <button type="submit" class="btn btn-primary w-100">Login</button>
       </form>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const isDoctor = document.getElementById('qualifiedDoctorCheck').checked;
+        const alertBox = document.getElementById('loginAlert');
+        alertBox.style.display = 'none';
+        alertBox.innerHTML = '';
+        try {
+          const response = await fetch('http://backend:5000/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password, isDoctor })
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            alertBox.className = 'alert alert-success';
+            alertBox.innerHTML = 'Login successful! Redirecting...';
+            alertBox.style.display = 'block';
+            setTimeout(() => {
+              window.location.href = '/Frontend/dashboard.html';
+            }, 1200);
+          } else {
+            alertBox.className = 'alert alert-danger';
+            alertBox.innerHTML = data.message || 'Login failed. Please check your credentials.';
+            alertBox.style.display = 'block';
+          }
+        } catch (err) {
+          alertBox.className = 'alert alert-danger';
+          alertBox.innerHTML = 'Server error. Please try again later.';
+          alertBox.style.display = 'block';
+        }
+      });
+    </script>
   </body>
 </html>

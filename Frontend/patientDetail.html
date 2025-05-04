@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Patient Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body style="background: linear-gradient(135deg, #e3f0ff 0%, #f8fbff 100%); min-height: 100vh;">
+    <div class="container my-5">
+      <div class="patients-header mb-4">
+        <h2 class="mb-0">Patient Details</h2>
+        <a href="patients.html" class="btn btn-light">Back to Patients List</a>
+      </div>
+      <div class="patient-detail-container" id="patientDetailContainer" style="align-items: flex-start; gap: 2rem;">
+        <div class="ultrasound-image d-flex flex-column align-items-center justify-content-start" id="ultrasoundImageContainer" style="width: 100%; max-width: 40vw; min-width: 400px; min-height: 400px; max-height: 1000px; overflow: hidden; padding: 32px; box-sizing: border-box; background: #fff; margin: auto;">
+          <!-- Image and sliders will be loaded here -->
+        </div>
+        <div class="patient-info" style="flex:1; min-width:300px; max-width: 50%;">
+          <h4>Patient Details</h4>
+          <dl class="row" id="patientInfoList">
+            <!-- Details will be loaded here -->
+          </dl>
+        </div>
+      </div>
+      <div class="disclaimer text-center mt-4">
+        <strong>Disclaimer:</strong> All patient data is handled in compliance with the <a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj" target="_blank">GDPR</a> and the <a href="https://artificialintelligenceact.eu/" target="_blank">EU AI Act</a>. Medical data is for professional use only and should not replace clinical judgment.
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      function getPatientIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id');
+      }
+
+      async function fetchPatientDetail(patientId) {
+        try {
+          const response = await fetch(`http://backend:5000/patient/${patientId}`);
+          const data = await response.json();
+          if (response.ok && data.success) {
+            renderPatientDetail(data.patient);
+          } else {
+            document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">Failed to load image</div>';
+            document.getElementById('patientInfoList').innerHTML = '<dt class="col-4">Error</dt><dd class="col-8">Failed to load patient details</dd>';
+          }
+        } catch (err) {
+          document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">Server error</div>';
+          document.getElementById('patientInfoList').innerHTML = '<dt class="col-4">Error</dt><dd class="col-8">Server error</dd>';
+        }
+      }
+
+      function renderPatientDetail(patient) {
+        // Render image
+        if (patient.image_base64) {
+          document.getElementById('ultrasoundImageContainer').innerHTML = `
+            <img id="ultrasoundImg" src="data:image/png;base64,${patient.image_base64}" alt="Ultrasound"
+              style="width:512px; height:512px; object-fit:contain; border-radius:1rem; box-shadow:0 2px 8px rgba(25,118,210,0.13); display:block; margin:auto;" />
+            <div id="imageAdjustSection" style="width:100%; max-width:320px; margin-top:24px;">
+              <label for="brightnessSlider" class="form-label">Brightness <span id="brightnessValue">0</span></label>
+              <input type="range" class="form-range" min="-100" max="100" value="0" id="brightnessSlider">
+              <label for="contrastSlider" class="form-label mt-2">Contrast <span id="contrastValue">0</span></label>
+              <input type="range" class="form-range" min="-100" max="100" value="0" id="contrastSlider">
+            </div>
+          `;
+          addImageAdjustmentListeners();
+          // Add switch event listener if saliency map exists
+          if (patient.saliency_map_base64) {
+            const switchElem = document.getElementById('saliencySwitch');
+            const imgElem = document.getElementById('ultrasoundImg');
+            switchElem.addEventListener('change', function() {
+              if (this.checked) {
+                imgElem.src = `data:image/png;base64,${patient.saliency_map_base64}`;
+                imgElem.alt = 'Saliency Map';
+              } else {
+                imgElem.src = `data:image/png;base64,${patient.image_base64}`;
+                imgElem.alt = 'Ultrasound';
+              }
+            });
+          }
+        } else {
+          document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-secondary">No image available</div>';
+        }
+        // Render info
+        const info = [
+          { label: 'Patient ID', value: patient.id },
+          { label: 'Name', value: patient.name },
+          { label: 'Sex', value: patient.sex },
+          { label: 'Study Date', value: patient.study_date },
+          { label: 'Study Time', value: patient.study_time },
+          { label: 'Study Type', value: patient.study_type },
+          { label: 'Study Zone', value: patient.study_zone },
+          { label: 'Study Result', value: patient.study_result },
+          { label: 'Image Height', value: patient.image_height },
+          { label: 'Image Width', value: patient.image_width }
+        ];
+        document.getElementById('patientInfoList').innerHTML = info.map(i => `<dt class="col-4">${i.label}</dt><dd class="col-8">${i.value}</dd>`).join('');
+      }
+
+      function addImageAdjustmentListeners() {
+        const img = document.getElementById('ultrasoundImg');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const contrastSlider = document.getElementById('contrastSlider');
+        const brightnessValue = document.getElementById('brightnessValue');
+        const contrastValue = document.getElementById('contrastValue');
+        function updateFilters() {
+          const brightness = 100 + parseInt(brightnessSlider.value, 10);
+          const contrast = 100 + parseInt(contrastSlider.value, 10);
+          img.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+          brightnessValue.textContent = brightnessSlider.value;
+          contrastValue.textContent = contrastSlider.value;
+        }
+        brightnessSlider.addEventListener('input', updateFilters);
+        contrastSlider.addEventListener('input', updateFilters);
+        updateFilters();
+      }
+
+      // On page load
+      const patientId = getPatientIdFromUrl();
+      if (patientId) {
+        fetchPatientDetail(patientId);
+      } else {
+        document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">No patient ID provided</div>';
+        document.getElementById('patientInfoList').innerHTML = '';
+      }
+    </script>
+  </body>
+</html>

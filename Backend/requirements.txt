@@ -1,3 +1,9 @@
 Flask==3.1.0
 flask-cors==5.0.1
 Gunicorn==21.0.0
+pydicom==3.0.1
+tensorflow[and-cuda]==2.16.2
+pillow==11.2.1
+tensorflow-io==0.37.1
+matplotlib==3.10.1
+opencv-python==4.11.0.86

@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  backend:
+    build: ./Backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./Backend/Databases:/app/Databases
+    networks:
+      - healthcare
+  frontend:
+    build: ./Frontend
+    ports:
+      - "8080:80"
+    networks:
+      - healthcare
+
+networks:
+  healthcare:
+    driver: bridge

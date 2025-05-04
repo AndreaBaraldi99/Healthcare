@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Patients List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body style="background: linear-gradient(135deg, #e3f0ff 0%, #f8fbff 100%); min-height: 100vh;">
+    <div class="container my-5">
+      <div class="patients-header mb-4">
+        <h2 class="mb-0">Patients List</h2>
+        <a href="/Frontend/dashboard.html" class="btn btn-light">Back to Dashboard</a>
+      </div>
+      <div class="row justify-content-center">
+        <div class="col-lg-8 mb-4 mb-lg-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-primary">
+                <tr>
+                  <th scope="col">Patient ID</th>
+                  <th scope="col">Sex</th>
+                  <th scope="col">Study Date</th>
+                  <th scope="col">Study Time</th>
+                  <th scope="col">Study Result</th>
+                </tr>
+              </thead>
+              <tbody id="patientsTableBody">
+                <!-- Rows will be inserted here by JS -->
+              </tbody>
+            </table>
+          </div>
+          <nav class="mt-4 d-flex justify-content-center">
+            <ul class="pagination mb-0" id="pagination" style="margin-left: 0.5rem;">
+              <!-- Pagination buttons will be inserted here by JS -->
+            </ul>
+          </nav>
+        </div>
+      </div>
+      <div class="disclaimer text-center mt-4">
+        <strong>Disclaimer:</strong> All patient data is handled in compliance with the <a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj" target="_blank">GDPR</a> and the <a href="https://artificialintelligenceact.eu/" target="_blank">EU AI Act</a>. Medical data is for professional use only and should not replace clinical judgment.
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      const PAGE_SIZE = 10;
+      let patients = [];
+      let currentPage = 1;
+
+      async function fetchPatients() {
+        try {
+          const response = await fetch('http://backend:5000/patients');
+          const data = await response.json();
+          if (response.ok && data.success) {
+            patients = data.patients;
+            renderTable();
+            renderPagination();
+          } else {
+            document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="5" class="text-danger">Failed to load patients.</td></tr>';
+          }
+        } catch (err) {
+          document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="5" class="text-danger">Server error.</td></tr>';
+        }
+      }
+
+      function renderTable() {
+        const tbody = document.getElementById('patientsTableBody');
+        tbody.innerHTML = '';
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const pagePatients = patients.slice(start, end);
+        if (pagePatients.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center">No patients found.</td></tr>';
+          return;
+        }
+        for (const p of pagePatients) {
+          const row = `<tr style="cursor:pointer" onclick="window.location.href='patientDetail.html?id=${p.id}'">
+            <td>${p.id}</td>
+            <td>${p.sex}</td>
+            <td>${p.study_date}</td>
+            <td>${p.study_time}</td>
+            <td>${p.study_result}</td>
+          </tr>`;
+          tbody.innerHTML += row;
+        }
+      }
+
+      function renderPagination() {
+        const pageCount = Math.ceil(patients.length / PAGE_SIZE);
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+        if (pageCount <= 1) return;
+        for (let i = 1; i <= pageCount; i++) {
+          pagination.innerHTML += `
+            <li class="page-item${i === currentPage ? ' active' : ''}">
+              <button class="page-link" onclick="goToPage(${i})">${i}</button>
+            </li>
+          `;
+        }
+      }
+
+      window.goToPage = function(page) {
+        currentPage = page;
+        renderTable();
+        renderPagination();
+      };
+
+      fetchPatients();
+    </script>
+  </body>
+</html>

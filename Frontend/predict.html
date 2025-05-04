@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prediction Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body style="background: linear-gradient(135deg, #e3f0ff 0%, #f8fbff 100%); min-height: 100vh;">
+    <div class="container my-5">
+      <div class="patients-header mb-4">
+        <h2 class="mb-0">Prediction Result</h2>
+        <a href="dashboard.html" class="btn btn-light">Back to Dashboard</a>
+      </div>
+      <!-- Upload and Predict Section -->
+      <div class="card shadow p-4 mb-4" style="max-width: 600px; margin: 0 auto 2rem auto;">
+        <h5 class="mb-3">Upload DICOM File for Prediction</h5>
+        <form id="predictUploadForm" enctype="multipart/form-data">
+          <div class="mb-3 d-flex align-items-center justify-content-between">
+            <input class="form-control me-2" type="file" id="dicomFileInput" name="image" accept=".dcm,application/dicom" required style="max-width:70%;">
+            <select class="form-select me-2" id="modelSelect" name="model" style="max-width: 150px;">
+              <option value="vgg">VGG</option>
+              <option value="resnet">ResNet</option>
+              <option value="densenet">DenseNet</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Predict</button>
+          </div>
+        </form>
+        <div id="predictionResult" class="mt-4" style="display:none;"></div>
+      </div>
+      <div class="patient-detail-container" id="patientDetailContainer" style="align-items: flex-start; gap: 2rem;">
+        <div class="ultrasound-image d-flex flex-column align-items-center justify-content-start" id="ultrasoundImageContainer" style="width: 100%; max-width: 40vw; min-width: 400px; min-height: 400px; max-height: 1000px; overflow: hidden; padding: 32px; box-sizing: border-box; background: #fff; margin: auto;">
+          <!-- Image and sliders will be loaded here -->
+        </div>
+        <div class="patient-info" style="flex:1; min-width:300px; max-width: 50%;">
+          <h4>Patient Details</h4>
+          <dl class="row" id="patientInfoList">
+            <!-- Details will be loaded here -->
+          </dl>
+        </div>
+      </div>
+      <div id="predictionSection" class="mt-5" style="max-width:700px;margin:auto;display:none;">
+        <h4 class="mb-3">Cancer Prediction</h4>
+        <div id="predictedClass" class="fs-4 fw-bold mb-2"></div>
+        <div class="progress" style="height: 32px;">
+          <div id="predictionBar" class="progress-bar progress-bar-striped" role="progressbar" style="font-size:1.2rem;line-height:32px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+      </div>
+      <div class="disclaimer text-center mt-4">
+        <strong>Disclaimer:</strong> All patient data is handled in compliance with the <a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj" target="_blank">GDPR</a> and the <a href="https://artificialintelligenceact.eu/" target="_blank">EU AI Act</a>. Medical data is for professional use only and should not replace clinical judgment.
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      function getPatientIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id');
+      }
+
+      async function fetchPatientDetail(patientId) {
+        try {
+          const response = await fetch(`http://backend:5000/patient/${patientId}`);
+          const data = await response.json();
+          if (response.ok && data.success) {
+            renderPatientDetail(data.patient);
+            fetchPrediction(patientId);
+          } else {
+            document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">Failed to load image</div>';
+            document.getElementById('patientInfoList').innerHTML = '<dt class="col-4">Error</dt><dd class="col-8">Failed to load patient details</dd>';
+          }
+        } catch (err) {
+          document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">Server error</div>';
+          document.getElementById('patientInfoList').innerHTML = '<dt class="col-4">Error</dt><dd class="col-8">Server error</dd>';
+        }
+      }
+
+      function renderPatientDetail(patient) {
+        // Render image
+        if (patient.image_base64 || patient.saliency_map_base64) {
+          // Add a switch to toggle between original and saliency map
+          let switchHtml = '';
+          if (patient.saliency_map_base64) {
+            switchHtml = `
+              <div class="form-check form-switch mb-3 d-flex align-items-center justify-content-center">
+                <input class="form-check-input" type="checkbox" id="saliencySwitch">
+                <label class="form-check-label ms-2" for="saliencySwitch">Show Saliency Map</label>
+              </div>
+            `;
+          }
+          let imgWidth = 512;
+          let imgHeight = 512;
+          document.getElementById('ultrasoundImageContainer').innerHTML = `
+            ${switchHtml}
+            <div style="width:${imgWidth}px;height:${imgHeight}px;display:flex;align-items:center;justify-content:center;">
+              <img id="ultrasoundImg" src="data:image/png;base64,${patient.image_base64}" alt="Ultrasound"
+                style="width:100%; height:100%; object-fit:contain; border-radius:1rem; box-shadow:0 2px 8px rgba(25,118,210,0.13); display:block; margin:auto;" />
+            </div>
+            <div id="imageAdjustSection" style="width:100%; max-width:320px; margin-top:24px;">
+              <label for="brightnessSlider" class="form-label">Brightness <span id="brightnessValue">0</span></label>
+              <input type="range" class="form-range" min="-100" max="100" value="0" id="brightnessSlider">
+              <label for="contrastSlider" class="form-label mt-2">Contrast <span id="contrastValue">0</span></label>
+              <input type="range" class="form-range" min="-100" max="100" value="0" id="contrastSlider">
+            </div>
+          `;
+          addImageAdjustmentListeners();
+          // Add switch event listener if saliency map exists
+          if (patient.saliency_map_base64) {
+            const switchElem = document.getElementById('saliencySwitch');
+            const imgElem = document.getElementById('ultrasoundImg');
+            switchElem.addEventListener('change', function() {
+              if (this.checked) {
+                imgElem.src = `data:image/png;base64,${patient.saliency_map_base64}`;
+                imgElem.alt = 'Saliency Map';
+              } else {
+                imgElem.src = `data:image/png;base64,${patient.image_base64}`;
+                imgElem.alt = 'Ultrasound';
+              }
+            });
+          }
+        } else {
+          document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-secondary">No image available</div>';
+        }
+        // Render info
+        const info = [
+          { label: 'Patient ID', value: patient.id },
+          { label: 'Name', value: patient.name },
+          { label: 'Sex', value: patient.sex },
+          { label: 'Study Date', value: patient.study_date },
+          { label: 'Study Time', value: patient.study_time },
+          { label: 'Study Type', value: patient.study_type },
+          { label: 'Study Zone', value: patient.study_zone },
+          { label: 'Study Result', value: patient.study_result },
+          { label: 'Image Height', value: patient.image_height },
+          { label: 'Image Width', value: patient.image_width }
+        ];
+        document.getElementById('patientInfoList').innerHTML = info.map(i => `<dt class="col-4">${i.label}</dt><dd class="col-8">${i.value}</dd>`).join('');
+      }
+
+      function addImageAdjustmentListeners() {
+        const img = document.getElementById('ultrasoundImg');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const contrastSlider = document.getElementById('contrastSlider');
+        const brightnessValue = document.getElementById('brightnessValue');
+        const contrastValue = document.getElementById('contrastValue');
+        function updateFilters() {
+          const brightness = 100 + parseInt(brightnessSlider.value, 10);
+          const contrast = 100 + parseInt(contrastSlider.value, 10);
+          img.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+          brightnessValue.textContent = brightnessSlider.value;
+          contrastValue.textContent = contrastSlider.value;
+        }
+        brightnessSlider.addEventListener('input', updateFilters);
+        contrastSlider.addEventListener('input', updateFilters);
+        updateFilters();
+      }
+
+      async function fetchPrediction(patientId) {
+        // Simulate API call to /predict or /predict/<id>
+        // Replace this with your real API call
+        // Example response: { success: true, predicted_class: "Malignant", probability: 0.87 }
+        try {
+          const response = await fetch(`http://backend:5000/predict/${patientId}`);
+          const data = await response.json();
+          if (response.ok && data.success) {
+            renderPrediction(data.predicted_class, data.probability);
+          } else {
+            renderPrediction('Prediction failed', 0);
+          }
+        } catch (err) {
+          renderPrediction('Server error', 0);
+        }
+      }
+
+      function renderPrediction(predictedClass, probability) {
+        const section = document.getElementById('predictionSection');
+        section.style.display = '';
+        document.getElementById('predictedClass').textContent = predictedClass;
+        const percent = Math.round(probability * 100);
+        const bar = document.getElementById('predictionBar');
+        bar.style.width = percent + '%';
+        bar.setAttribute('aria-valuenow', percent);
+        bar.textContent = percent + '%';
+        bar.className = 'progress-bar progress-bar-striped';
+        if (percent >= 80) {
+          bar.classList.add('bg-danger');
+        } else if (percent >= 50) {
+          bar.classList.add('bg-warning');
+        } else {
+          bar.classList.add('bg-success');
+        }
+      }
+
+      document.getElementById('predictUploadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('dicomFileInput');
+        const modelSelect = document.getElementById('modelSelect');
+        const resultDiv = document.getElementById('predictionResult');
+        resultDiv.style.display = 'none';
+        resultDiv.innerHTML = '';
+        if (!fileInput.files.length) {
+          resultDiv.style.display = 'block';
+          resultDiv.innerHTML = '<div class="alert alert-warning">Please select a DICOM file.</div>';
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('model', modelSelect.value);
+        resultDiv.innerHTML = '<div class="text-info">Predicting...</div>';
+        resultDiv.style.display = 'block';
+        try {
+          const response = await fetch('http://backend:5000/predict', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            // Show patient info and prediction
+            let html = '<h5>Prediction Result</h5>';
+            html += `<div class='mb-2'><strong>Predicted Class:</strong> ${data.predicted_class}</div>`;
+            html += `<div class='mb-2'><strong>Probability:</strong> ${(data.probability * 100)}%</div>`;
+            html += '<hr/>';
+            // Colorbar
+            html += `<div class='mb-2'><strong>Model Confidence</strong></div>`;
+            html += `<div class="progress" style="height: 32px;">
+              <div class="progress-bar ${data.probability >= 0.8 ? 'bg-danger' : data.probability >= 0.5 ? 'bg-warning' : 'bg-success'}" role="progressbar" style="width: ${(data.probability * 100).toFixed(1)}%; font-size:1.2rem; line-height:32px;" aria-valuenow="${(data.probability * 100).toFixed(1)}" aria-valuemin="0" aria-valuemax="100">${(data.probability * 100).toFixed(1)}%</div>
+            </div>`;
+            resultDiv.innerHTML = html;
+            // Render patient details and image below the prediction result
+            if (data.patient && (data.patient.image_base64 || data.patient.saliency_map_base64)) {
+              // Add a switch to toggle between original and saliency map
+              let switchHtml = '';
+              if (data.patient.saliency_map_base64) {
+                switchHtml = `
+                  <div class="form-check form-switch mb-3 d-flex align-items-center justify-content-center">
+                    <input class="form-check-input" type="checkbox" id="saliencySwitch">
+                    <label class="form-check-label ms-2" for="saliencySwitch">Show Saliency Map</label>
+                  </div>
+                `;
+              }
+              let imgWidth = 512;
+              let imgHeight = 512;
+              document.getElementById('ultrasoundImageContainer').innerHTML = `
+                ${switchHtml}
+                <div style="width:${imgWidth}px;height:${imgHeight}px;display:flex;align-items:center;justify-content:center;">
+                  <img id="ultrasoundImg" src="data:image/png;base64,${data.patient.image_base64}" alt="Ultrasound"
+                    style="width:100%; height:100%; object-fit:contain; border-radius:1rem; box-shadow:0 2px 8px rgba(25,118,210,0.13); display:block; margin:auto;" />
+                </div>
+                <div id="imageAdjustSection" style="width:100%; max-width:320px; margin-top:24px;">
+                  <label for="brightnessSlider" class="form-label">Brightness <span id="brightnessValue">0</span></label>
+                  <input type="range" class="form-range" min="-100" max="100" value="0" id="brightnessSlider">
+                  <label for="contrastSlider" class="form-label mt-2">Contrast <span id="contrastValue">0</span></label>
+                  <input type="range" class="form-range" min="-100" max="100" value="0" id="contrastSlider">
+                </div>
+              `;
+              addImageAdjustmentListeners();
+              // Add switch event listener if saliency map exists
+              if (data.patient.saliency_map_base64) {
+                const switchElem = document.getElementById('saliencySwitch');
+                const imgElem = document.getElementById('ultrasoundImg');
+                switchElem.addEventListener('change', function() {
+                  if (this.checked) {
+                    imgElem.src = `data:image/png;base64,${data.patient.saliency_map_base64}`;
+                    imgElem.alt = 'Saliency Map';
+                  } else {
+                    imgElem.src = `data:image/png;base64,${data.patient.image_base64}`;
+                    imgElem.alt = 'Ultrasound';
+                  }
+                });
+              }
+            } else {
+              document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-secondary">No image available</div>';
+            }
+            if (data.patient) {
+              const info = [
+                { label: 'Patient ID', value: data.patient.id },
+                { label: 'Name', value: data.patient.name },
+                { label: 'Sex', value: data.patient.sex },
+                { label: 'Study Date', value: data.patient.study_date },
+                { label: 'Study Time', value: data.patient.study_time },
+                { label: 'Study Type', value: data.patient.study_type },
+                { label: 'Study Zone', value: data.patient.study_zone },
+                { label: 'Real Label (for test)', value: data.patient.study_result },
+                { label: 'Image Height', value: data.patient.image_height },
+                { label: 'Image Width', value: data.patient.image_width }
+              ];
+              document.getElementById('patientInfoList').innerHTML = info.map(i => `<dt class="col-4">${i.label}</dt><dd class="col-8">${i.value}</dd>`).join('');
+            }
+          } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message || 'Prediction failed.'}</div>`;
+          }
+        } catch (err) {
+          resultDiv.innerHTML = '<div class="alert alert-danger">Server error. Please try again later.</div>';
+        }
+      });
+
+      // On page load
+      const patientId = getPatientIdFromUrl();
+      if (patientId) {
+        fetchPatientDetail(patientId);
+      } else {
+        document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-danger">No patient ID provided</div>';
+        document.getElementById('patientInfoList').innerHTML = '';
+      }
+    </script>
+  </body>
+</html>
