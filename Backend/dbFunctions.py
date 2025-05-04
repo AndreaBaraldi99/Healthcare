@@ -5,8 +5,8 @@ from models import User, Patient
 import pydicom as dicom
 import glob
 
-DATABASE = "./app/Databases/users.db"
-PATIENTS_DATABASE = "./app/Databases/patients.db"
+DATABASE = "./Backend/Databases/users.db"
+PATIENTS_DATABASE = "./Backend/Databases/patients.db"
 
 
 def get_db_connection(database):
