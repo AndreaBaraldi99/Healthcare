@@ -37,7 +37,7 @@
 
       async function fetchPatientDetail(patientId) {
         try {
-          const response = await fetch(`http://backend:5000/patient/${patientId}`);
+          const response = await fetch(`http://localhost:5000/patient/${patientId}`);
           const data = await response.json();
           if (response.ok && data.success) {
             renderPatientDetail(data.patient);

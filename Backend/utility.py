@@ -8,7 +8,13 @@ import matplotlib.pyplot as plt
 def bytes_to_base64(patient_dict):
     """
     Convert bytes to base64 string. Resize to 256x256 before encoding.
+    Do NOT overwrite image_base64 if it already exists (e.g., overlay from prediction).
     """
+    if 'image_base64' in patient_dict and patient_dict['image_base64']:
+        # Already set (e.g., overlay), do not overwrite
+        if 'image' in patient_dict:
+            del patient_dict['image']
+        return patient_dict
     if 'image' in patient_dict and patient_dict['image']:
         try:
             # Determine dtype
@@ -80,4 +86,66 @@ def create_saliency_map(model, image_tensor):
     saliency_map_base64 = base64.b64encode(buf.read()).decode('utf-8')
     # Plot and overlay using matplotlib, save to buffer
     return saliency_map_base64
+
+def calculate_iou(box1, box2):
+    """Calculates the Intersection over Union (IoU) of two bounding boxes.
+
+    Args:
+        box1: A tuple (x_min, y_min, x_max, y_max) representing the first bounding box.
+        box2: A tuple (x_min, y_min, x_max, y_max) representing the second bounding box.
+
+    Returns:
+        The IoU of the two boxes, or 0 if there is no intersection.
+    """
+    x_min1, y_min1, x_max1, y_max1 = box1
+    x_min2, y_min2, x_max2, y_max2 = box2
+
+    # Calculate intersection coordinates
+    x_min_inter = max(x_min1, x_min2)
+    y_min_inter = max(y_min1, y_min2)
+    x_max_inter = min(x_max1, x_max2)
+    y_max_inter = min(y_max1, y_max2)
+
+    # Calculate intersection area
+    inter_width = max(0, x_max_inter - x_min_inter)
+    inter_height = max(0, y_max_inter - y_min_inter)
+    inter_area = inter_width * inter_height
+
+    # Calculate union area
+    box1_area = (x_max1 - x_min1) * (y_max1 - y_min1)
+    box2_area = (x_max2 - x_min2) * (y_max2 - y_min2)
+    union_area = box1_area + box2_area - inter_area
+
+    # Calculate IoU
+    iou = inter_area / union_area if union_area > 0.2 else 0
+    return iou
+
+def non_max_suppression(predicted_boxes, iou_threshold):
+    if not predicted_boxes:
+        return []
+
+    boxes = [box.xyxy[0].tolist() for box in predicted_boxes]
+    scores = [box.conf[0].item() for box in predicted_boxes]
+
+    # Combine boxes and scores
+    indexed_boxes = list(zip(boxes, scores))
+
+    # Sort boxes by score descending
+    indexed_boxes.sort(key=lambda x: x[1], reverse=True)
+
+    selected_boxes = []
+
+    while indexed_boxes:
+        best_box, best_score = indexed_boxes.pop(0)
+        selected_boxes.append(best_box)
+
+        to_keep = []
+        for box, score in indexed_boxes:
+            iou = calculate_iou(best_box, box)
+            if iou < iou_threshold:
+                to_keep.append((box, score))  # Keep boxes that don't overlap too much
+
+        indexed_boxes = to_keep
+
+    return selected_boxes
 

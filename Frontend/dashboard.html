@@ -49,7 +49,7 @@
         //Get the user when the page loads
         window.onload = async function() {
           try {
-            const response = await fetch('http://backend:5000/user', {
+            const response = await fetch('http://localhost:5000/user', {
               method: 'GET',
               headers: {
               'Content-Type': 'application/json'

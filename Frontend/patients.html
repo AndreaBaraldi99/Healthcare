@@ -50,7 +50,7 @@
 
       async function fetchPatients() {
         try {
-          const response = await fetch('http://backend:5000/patients');
+          const response = await fetch('http://localhost:5000/patients');
           const data = await response.json();
           if (response.ok && data.success) {
             patients = data.patients;
