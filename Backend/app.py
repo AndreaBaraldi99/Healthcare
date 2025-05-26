@@ -248,20 +248,36 @@ def predict():
         
         # Continue with overlay creation
         pred_mask = mask_probs_orig > 0.5
+        # Calculate tumor area from the mask
+        tumor_area_pixels = np.sum(pred_mask)
+        total_pixels = pred_mask.shape[0] * pred_mask.shape[1]
+        tumor_area_percentage = (tumor_area_pixels / total_pixels) * 100
+        
         overlay_img = cv2.cvtColor(orig_img, cv2.COLOR_RGB2BGR)
-        alpha = 0.7
+        # Make the segmentation mask more transparent
+        alpha = 0.4  # Reduced from 0.7 to make it more transparent
         red_mask = np.zeros_like(overlay_img)
         red_mask[..., 2] = 255  # Red in BGR
         mask_indices = pred_mask.astype(bool)
         overlay_img[mask_indices] = cv2.addWeighted(overlay_img[mask_indices], 1 - alpha, red_mask[mask_indices], alpha, 0)
         cv2.rectangle(overlay_img, (x1o, y1o), (x2o, y2o), (0, 255, 0), 2)
+        
+        # No longer adding tumor area text to the image
         # Convert back to RGB for PIL
         overlay_img_rgb = cv2.cvtColor(overlay_img, cv2.COLOR_BGR2RGB)
-        overlay_img_pil = Image.fromarray(overlay_img_rgb)
+        
+        # Resize the image to 256x256
+        overlay_img_resized = cv2.resize(overlay_img_rgb, (256, 256), interpolation=cv2.INTER_AREA)
+        
+        overlay_img_pil = Image.fromarray(overlay_img_resized)
         buf = BytesIO()
         overlay_img_pil.save(buf, format='PNG')
         overlay_img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         patient_dict["image_base64"] = overlay_img_base64
+        
+        # Add tumor area to patient dictionary
+        patient_dict["tumor_area_pixels"] = int(tumor_area_pixels)
+        patient_dict["tumor_area_percentage"] = float(tumor_area_percentage)
         # Convert any bytes fields to base64 for JSON serialization
         patient_dict = bytes_to_base64(patient_dict)
         # --- Classification and saliency map (unchanged) ---

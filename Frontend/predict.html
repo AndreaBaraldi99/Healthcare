@@ -122,6 +122,16 @@
         } else {
           document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-secondary">No image available</div>';
         }
+        
+        // Calculate tumor area in mm²
+        let tumorAreaMm2 = 'N/A';
+        if (patient.tumor_area_pixels && patient.image_height && patient.image_width) {
+          // Assuming a standard ultrasound image size of 100mm x 100mm
+          // Calculate the pixel-to-mm conversion factor
+          const pixelToMmFactor = (100 * 100) / (patient.image_height * patient.image_width);
+          tumorAreaMm2 = (patient.tumor_area_pixels * pixelToMmFactor).toFixed(2);
+        }
+        
         // Render info
         const info = [
           { label: 'Patient ID', value: patient.id },
@@ -131,10 +141,19 @@
           { label: 'Study Time', value: patient.study_time },
           { label: 'Study Type', value: patient.study_type },
           { label: 'Study Zone', value: patient.study_zone },
-          { label: 'Study Result', value: patient.study_result },
+          { label: 'Study Result', value: patient.study_result }
+        ];
+        
+        // Add tumor area information if available
+        if (patient.tumor_area_pixels) {
+          info.push({ label: 'Tumor Area', value: `${tumorAreaMm2} mm² (${patient.tumor_area_percentage?.toFixed(2)}%)` });
+        }
+        
+        info.push(
           { label: 'Image Height', value: patient.image_height },
           { label: 'Image Width', value: patient.image_width }
-        ];
+        );
+        
         document.getElementById('patientInfoList').innerHTML = info.map(i => `<dt class="col-4">${i.label}</dt><dd class="col-8">${i.value}</dd>`).join('');
       }
 
@@ -274,18 +293,16 @@
               document.getElementById('ultrasoundImageContainer').innerHTML = '<div class="text-secondary">No image available</div>';
             }
             if (data.patient) {
-              const info = [
-                { label: 'Patient ID', value: data.patient.id },
-                { label: 'Name', value: data.patient.name },
-                { label: 'Sex', value: data.patient.sex },
-                { label: 'Study Date', value: data.patient.study_date },
-                { label: 'Study Time', value: data.patient.study_time },
-                { label: 'Study Type', value: data.patient.study_type },
-                { label: 'Study Zone', value: data.patient.study_zone },
-                { label: 'Real Label (for test)', value: data.patient.study_result },
-                { label: 'Image Height', value: data.patient.image_height },
-                { label: 'Image Width', value: data.patient.image_width }
-              ];
+              // Calculate tumor area in mm²
+              let tumorAreaMm2 = 'N/A';
+              if (data.patient.tumor_area_pixels && data.patient.image_height && data.patient.image_width) {
+                // Assuming a standard ultrasound image size of 100mm x 100mm
+                // Calculate the pixel-to-mm conversion factor
+                const pixelToMmFactor = (100 * 100) / (data.patient.image_height * data.patient.image_width);
+                tumorAreaMm2 = (data.patient.tumor_area_pixels * pixelToMmFactor).toFixed(2);
+              }
+              
+              const info = [                { label: 'Patient ID', value: data.patient.id },                { label: 'Name', value: data.patient.name },                { label: 'Sex', value: data.patient.sex },                { label: 'Study Date', value: data.patient.study_date },                { label: 'Study Time', value: data.patient.study_time },                { label: 'Study Type', value: data.patient.study_type },                { label: 'Study Zone', value: data.patient.study_zone },                { label: 'Real Label (for test)', value: data.patient.study_result },                { label: 'Tumor Area', value: `${tumorAreaMm2} mm² (${data.patient.tumor_area_percentage?.toFixed(2)}%)` },                { label: 'Image Height', value: data.patient.image_height },                { label: 'Image Width', value: data.patient.image_width }              ];
               document.getElementById('patientInfoList').innerHTML = info.map(i => `<dt class="col-4">${i.label}</dt><dd class="col-8">${i.value}</dd>`).join('');
             }
           } else {
